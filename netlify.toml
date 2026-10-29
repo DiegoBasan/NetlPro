@@ -1,0 +1,7 @@
+[build]
+  command = "echo Fotos Puente listo"
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
