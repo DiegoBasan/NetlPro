@@ -12,6 +12,27 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual, randomUUID } from
 const CHUNK = 4_000_000;
 const TOKEN_DAYS = 365;
 const store = () => getStore({ name: "media", consistency: "strong" });
+const istore = () => getStore({ name: "instr", consistency: "strong" });
+
+/* ---------- instrucciones ---------- */
+type Block = { id: string; type: "text" | "image"; text?: string; kind?: "step" | "note"; img?: string; w?: number; h?: number; caption?: string };
+type Doc = { id: string; title: string; desc: string; blocks: Block[]; createdAt: number; updatedAt: number };
+const imgIds = (d: Doc | null) => new Set((d?.blocks || []).filter((b) => b.type === "image" && b.img).map((b) => b.img!));
+function sanitizeDoc(raw: any, prev: Doc | null): Doc {
+  const str = (v: unknown, max: number) => String(v ?? "").slice(0, max);
+  const blocks: Block[] = (Array.isArray(raw.blocks) ? raw.blocks : []).slice(0, 500).map((b: any) => {
+    const id = /^[a-z0-9-]{4,60}$/i.test(b?.id) ? b.id : randomUUID().slice(0, 12);
+    if (b?.type === "image") {
+      return { id, type: "image", img: /^[a-z0-9-]{8,60}$/i.test(b.img) ? b.img : undefined, w: Number(b.w) || undefined, h: Number(b.h) || undefined, caption: str(b.caption, 500) };
+    }
+    return { id, type: "text", kind: b?.kind === "note" ? "note" : "step", text: str(b?.text, 8000) };
+  });
+  return { id: raw.id, title: str(raw.title, 160).trim() || "Sin título", desc: str(raw.desc, 4000), blocks, createdAt: prev?.createdAt || Date.now(), updatedAt: Date.now() };
+}
+async function deleteImages(ids: Iterable<string>) {
+  const s = istore();
+  await Promise.all([...ids].flatMap((i) => [s.delete(`img/${i}`), s.delete(`thumb/${i}`)]));
+}
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -273,6 +294,59 @@ export default async (req: Request) => {
         },
       });
       return new Response(stream, { headers: { ...common, "content-length": String(it.size) } });
+    }
+
+    /* ----- instrucciones ----- */
+    const is = istore();
+    if (route === "docs" && req.method === "GET") {
+      const { blobs } = await is.list({ prefix: "docs/" });
+      const docs = (await Promise.all(blobs.map((b) => is.get(b.key, { type: "json" })))) as (Doc | null)[];
+      const list = docs.filter(Boolean).map((d) => ({
+        id: d!.id, title: d!.title, updatedAt: d!.updatedAt,
+        steps: d!.blocks.filter((b) => b.type === "text" && b.kind !== "note" && b.text?.trim()).length,
+        photos: d!.blocks.filter((b) => b.type === "image" && b.img).length,
+        cover: d!.blocks.find((b) => b.type === "image" && b.img)?.img || null,
+      }));
+      list.sort((a, b) => b.updatedAt - a.updatedAt);
+      return json({ docs: list });
+    }
+    if (route === "doc") {
+      const id = q("id");
+      if (!validId(id)) return json({ error: "id inválido" }, 400);
+      const key = `docs/${id}`;
+      if (req.method === "GET") {
+        const d = await is.get(key, { type: "json" });
+        return d ? json({ doc: d }) : json({ error: "No existe" }, 404);
+      }
+      if (req.method === "PUT") {
+        const prev = (await is.get(key, { type: "json" })) as Doc | null;
+        const doc = sanitizeDoc({ ...(await req.json()), id }, prev);
+        await is.setJSON(key, doc);
+        const keep = imgIds(doc), gone = [...imgIds(prev)].filter((i) => !keep.has(i));
+        if (gone.length) await deleteImages(gone);
+        return json({ ok: true, updatedAt: doc.updatedAt });
+      }
+      if (req.method === "DELETE") {
+        const prev = (await is.get(key, { type: "json" })) as Doc | null;
+        if (prev) await deleteImages(imgIds(prev));
+        await is.delete(key);
+        return json({ ok: true });
+      }
+    }
+    if (route === "img") {
+      const id = q("id"), v = q("v") === "thumb" ? "thumb" : "img";
+      if (!validId(id)) return json({ error: "id inválido" }, 400);
+      if (req.method === "PUT") {
+        const body = await req.arrayBuffer();
+        if (!body.byteLength || body.byteLength > CHUNK) return json({ error: "Imagen demasiado grande" }, 400);
+        await is.set(`${v}/${id}`, body);
+        return json({ ok: true });
+      }
+      if (req.method === "GET") {
+        const data = await is.get(`${v}/${id}`, { type: "arrayBuffer" });
+        if (!data) return json({ error: "No encontrado" }, 404);
+        return binary(data, "image/jpeg");
+      }
     }
 
     return json({ error: "Ruta no encontrada" }, 404);
