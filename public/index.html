@@ -146,6 +146,12 @@
   .tinfo { padding: 6px 8px 8px; display: grid; gap: 1px; min-width: 0; }
   .tinfo .nm { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tinfo .dt { font: 11.5px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fileic { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; color: var(--muted); }
+  .fileic svg { width: 46%; height: auto; max-width: 64px; }
+  .fileic b { font: 600 12px var(--f-mono); letter-spacing: .04em; color: var(--fg); background: var(--surface); border: 1px solid var(--line); padding: 1px 7px; border-radius: 6px; text-transform: uppercase; }
+  .qthumb .fileic svg { width: 26px; } .qthumb .fileic b { font-size: 9.5px; padding: 0 4px; }
+  .filebig { width: min(240px, 70vw); aspect-ratio: 1; position: relative; background: var(--surface-2); border-radius: 18px; flex-shrink: 0; }
+  .filebig .fileic svg { max-width: 96px; } .filebig .fileic b { font-size: 15px; }
   .empty { text-align: center; color: var(--muted); padding: 40px 10px; border: 2px dashed var(--line); border-radius: 14px; }
 
   /* ---------- camera (siempre oscura, como la cámara del iPhone) ---------- */
@@ -242,9 +248,9 @@
     </div>
     <div class="panel">
       <label class="pick" for="files">
-        <strong>Elegir fotos o videos</strong>
+        <strong>Elegir fotos, videos o archivos</strong>
         <span>Puedes seleccionar varios a la vez</span>
-        <input id="files" type="file" accept="image/*,video/*" multiple>
+        <input id="files" type="file" multiple>
       </label>
       <div id="queue" class="queue"></div>
       <div class="bar" id="bar" hidden><div></div></div>
@@ -326,6 +332,7 @@
     <button id="editSave" class="btn primary block">Guardar nombre</button>
     <div class="row">
       <button id="vCopy" class="btn">Copiar imagen</button>
+      <a id="vOpen" class="btn" target="_blank" rel="noopener" hidden>Abrir</a>
       <button id="vDown" class="btn">Descargar</button>
       <button id="vDel" class="btn danger">Borrar</button>
     </div>
@@ -396,6 +403,11 @@ const extFor = (file, type) => {
   const fromName = (file.name.match(/\.([a-z0-9]{2,5})$/i) || [])[1];
   return (m[type] || fromName || "bin").toLowerCase();
 };
+const FILE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+const fileIcon = (ext) => `<span class="fileic">${FILE_SVG}<b>${esc((ext || "archivo").slice(0, 6))}</b></span>`;
+const kindOf = (f) => f.type.startsWith("video/") ? "video" : (f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name)) ? "image" : "file";
+const extOfName = (n) => ((n.match(/\.([a-z0-9]{1,6})$/i) || [])[1] || "").toLowerCase();
+const OPENABLE = /^(image\/|video\/|audio\/|application\/pdf$|text\/plain$)/i;
 const url = (route, params = {}) => `/api/${route}?` + new URLSearchParams({ ...params, t: TOKEN });
 
 async function api(route, { method = "GET", body, json, query } = {}) {
@@ -556,7 +568,7 @@ $("#camFolder").oninput = () => { $("#folder").value = $("#camFolder").value; ls
 $("#files").onchange = async (e) => {
   const files = [...e.target.files]; e.target.value = "";
   for (const f of files) {
-    const q = { file: f, kind: f.type.startsWith("video") ? "video" : "image", name: stripExt(f.name), preview: "", status: "", label: "" };
+    const q = { file: f, kind: kindOf(f), name: stripExt(f.name), preview: "", status: "", label: "" };
     queue.push(q);
     if (q.kind === "image") q.preview = URL.createObjectURL(f);
   }
@@ -577,7 +589,7 @@ function renderQueue() {
   queue.forEach((q, i) => {
     const row = document.createElement("div"); row.className = "qitem";
     const done = q.status === "ok", busy = q.status === "busy";
-    row.innerHTML = `<div class="qthumb">${q.preview ? `<img src="${q.preview}" alt="">` : ""}${q.kind === "video" ? `<span class="vb">▶ ${q.duration ? fmtDur(q.duration) : ""}</span>` : ""}</div>
+    row.innerHTML = `<div class="qthumb">${q.preview ? `<img src="${q.preview}" alt="" onerror="this.remove()">` : q.kind === "file" ? fileIcon(extOfName(q.file.name)) : ""}${q.kind === "video" ? `<span class="vb">▶ ${q.duration ? fmtDur(q.duration) : ""}</span>` : ""}</div>
       <input type="text" id="q-${i}" aria-label="Nombre" value="${esc(q.name)}" ${done || busy ? "disabled" : ""}>
       <span class="qmeta"><span class="st ${q.status}">${esc(q.label || fmtSize(q.file.size))}</span>${done || busy ? "" : '<button class="x" aria-label="Quitar">×</button>'}</span>`;
     row.querySelector("input").oninput = (e) => q.name = e.target.value;
@@ -607,7 +619,11 @@ async function putWithRetry(route, params, body) {
 
 async function uploadOne(q, folder, onBytes) {
   setQ(q, "busy", "preparando");
-  const p = q.kind === "video" ? await (q.prepared || processVideo(q.file)) : await processImage(q.file);
+  const asFile = () => ({ blob: q.file, type: q.file.type || "application/octet-stream", thumb: null, med: null });
+  let p;
+  if (q.kind === "video") p = await (q.prepared || processVideo(q.file));
+  else if (q.kind === "image") { try { p = await processImage(q.file); } catch { q.kind = "file"; p = asFile(); } } // formato de imagen que el navegador no lee
+  else p = asFile();
   const blob = p.blob;
   const created = await api("items", { method: "POST", json: {
     name: cleanName(q.name, stripExt(q.file.name)), folder, kind: q.kind, type: p.type, ext: extFor(q.file, p.type),
@@ -762,7 +778,7 @@ function groups() {
 function renderGallery() {
   $("#folderList").innerHTML = [...new Set(items.map(i => i.folder))].map(f => `<option value="${esc(f)}">`).join("");
   const el = $("#gallery"); el.innerHTML = "";
-  if (!items.length) { el.innerHTML = '<div class="empty">Aún no hay nada.<br>Toma fotos con la Cámara o súbelas en Subir.</div>'; updateSel(); return; }
+  if (!items.length) { el.innerHTML = '<div class="empty">Aún no hay nada.<br>Toma fotos con la Cámara o sube fotos, videos y archivos en Subir.</div>'; updateSel(); return; }
   for (const [folder, list] of groups()) {
     const sec = document.createElement("section"); sec.className = "folder";
     sec.innerHTML = `<div class="fhead"><h2>${esc(folder)}</h2><span class="n">${list.length}</span>
@@ -777,12 +793,12 @@ function renderGallery() {
       const on = selected.has(it.id);
       const t = document.createElement("div"); t.className = "tile" + (on ? " sel" : "");
       t.innerHTML = `<button class="pic" aria-label="Abrir ${esc(it.name)}">
-          ${it.hasThumb ? `<img loading="lazy" src="${url("thumb", { id: it.id })}" alt="">` : `<span class="noimg">${it.kind === "video" ? "Video" : "Sin vista previa"}</span>`}
+          ${it.hasThumb ? `<img loading="lazy" src="${url("thumb", { id: it.id })}" alt="">` : it.kind === "file" ? fileIcon(it.ext) : `<span class="noimg">${it.kind === "video" ? "Video" : "Sin vista previa"}</span>`}
           ${it.kind === "video" ? `<span class="vb">▶ ${it.duration ? fmtDur(it.duration) : ""}</span>` : ""}
         </button>
         <button class="ck" aria-label="Seleccionar" aria-pressed="${on}">${on ? "✓" : ""}</button>
         ${it.kind === "image" ? '<button class="tcopy">Copiar</button>' : ""}
-        <div class="tinfo"><span class="nm" title="${esc(it.name)}">${esc(it.name)}</span><span class="dt">${fmtDate(it.uploadedAt)}</span></div>`;
+        <div class="tinfo"><span class="nm" title="${esc(it.name)}">${esc(it.name)}</span><span class="dt">${fmtDate(it.uploadedAt)}${it.kind === "file" ? " · " + fmtSize(it.size) : ""}</span></div>`;
       t.querySelector(".pic").onclick = () => openViewer(it);
       t.querySelector(".ck").onclick = () => { on ? selected.delete(it.id) : selected.add(it.id); renderGallery(); };
       const c = t.querySelector(".tcopy"); if (c) c.onclick = () => copyImage(it, c);
@@ -889,13 +905,15 @@ async function copyImage(it, btn) {
 function openViewer(it) {
   viewing = it;
   const box = $("#viewerMedia");
-  box.innerHTML = it.kind === "video"
+  box.innerHTML = it.kind === "file" ? `<div class="filebig">${fileIcon(it.ext)}</div>` : it.kind === "video"
     ? `<video class="media" controls playsinline preload="metadata" ${it.hasThumb ? `poster="${url("thumb", { id: it.id })}"` : ""} src="${url("raw", { id: it.id })}"></video>`
     : `<img class="media" alt="${esc(it.name)}" src="${it.hasMed ? url("med", { id: it.id }) : url("thumb", { id: it.id })}">`;
   $("#editName").value = it.name; $("#editFolder").value = it.folder || "";
   const dims = it.width ? ` · ${it.width}×${it.height}` : "";
   $("#viewerInfo").textContent = `Subido el ${fmtDateLong(it.uploadedAt)} · ${fmtSize(it.size)}${dims}${it.kind === "video" && it.duration ? " · " + fmtDur(it.duration) : ""}`;
   $("#vCopy").hidden = it.kind !== "image";
+  $("#vOpen").hidden = !(it.kind === "file" && OPENABLE.test(it.type));
+  $("#vOpen").href = url("raw", { id: it.id });
   $("#viewer").hidden = false;
 }
 function closeViewer() { $("#viewerMedia").innerHTML = ""; $("#viewer").hidden = true; viewing = null; }

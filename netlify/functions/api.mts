@@ -70,7 +70,7 @@ async function validToken(tok: string) {
 
 /* ---------- items ---------- */
 type Item = {
-  id: string; name: string; folder: string; kind: "image" | "video"; type: string; ext: string;
+  id: string; name: string; folder: string; kind: "image" | "video" | "file"; type: string; ext: string;
   size: number; chunks: number; uploadedAt: number; complete: boolean;
   hasThumb?: boolean; hasMed?: boolean; duration?: number; width?: number; height?: number;
 };
@@ -151,7 +151,7 @@ export default async (req: Request) => {
       const it: Item = {
         id: `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`,
         name: clean(b.name, "archivo"), folder: clean(b.folder, "Sin carpeta"),
-        kind: b.kind === "video" ? "video" : "image",
+        kind: b.kind === "video" ? "video" : b.kind === "file" ? "file" : "image",
         type: String(b.type || "application/octet-stream").slice(0, 80),
         ext: clean(b.ext, "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "bin",
         size, chunks: Math.ceil(size / CHUNK), uploadedAt: Date.now(), complete: false,
@@ -237,7 +237,14 @@ export default async (req: Request) => {
       const it = validId(id) ? await getItem(id!) : null;
       if (!it || !it.complete) return json({ error: "No encontrado" }, 404);
       const range = req.headers.get("range");
-      const common = { "content-type": it.type, "accept-ranges": "bytes", "cache-control": "private, max-age=86400" };
+      // solo se muestran en el navegador tipos seguros; lo demás se descarga (evita que un .html corra dentro de la app)
+      const inline = /^(image\/(jpeg|png|gif|webp|heic|heif)|video\/|audio\/|application\/pdf$|text\/plain$)/i.test(it.type);
+      const fname = encodeURIComponent(`${it.name}.${it.ext}`);
+      const common = {
+        "content-type": inline ? it.type : "application/octet-stream", "accept-ranges": "bytes", "cache-control": "private, max-age=86400",
+        "x-content-type-options": "nosniff",
+        "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${fname}`,
+      };
 
       if (range) {
         const m = /bytes=(\d*)-(\d*)/.exec(range);
