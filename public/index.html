@@ -329,7 +329,11 @@
     <div class="field"><label for="editName">Nombre</label><input id="editName" type="text" autocomplete="off"></div>
     <div class="field"><label for="editFolder">Carpeta</label><input id="editFolder" type="text" list="folderList" autocomplete="off"></div>
     <p class="hint" id="viewerInfo"></p>
-    <button id="editSave" class="btn primary block">Guardar nombre</button>
+    <button id="vShare" class="btn primary block" hidden>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/><path d="M8 11H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2"/></svg>
+      <span id="vShareTxt">Compartir</span>
+    </button>
+    <button id="editSave" class="btn block">Guardar nombre</button>
     <div class="row">
       <button id="vCopy" class="btn">Copiar imagen</button>
       <a id="vOpen" class="btn" target="_blank" rel="noopener" hidden>Abrir</a>
@@ -901,6 +905,48 @@ async function copyImage(it, btn) {
   setTimeout(() => { btn.textContent = old; }, 1600);
 }
 
+/* ---------- compartir (menú del sistema: WhatsApp, Teams, AirDrop…) ---------- */
+const SHARE_AUTO_MAX = 60 * 1048576;  // hasta este tamaño se prepara solo al abrir
+let shareState = null;
+const canShareFiles = (() => {
+  try { return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.txt", { type: "text/plain" })] })); }
+  catch { return false; }
+})();
+function shareMime(it, blob) {
+  if (it.type && it.type !== "application/octet-stream") return it.type;
+  const m = { pdf: "application/pdf", txt: "text/plain", csv: "text/csv", jpg: "image/jpeg", png: "image/png",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", zip: "application/zip" };
+  return m[it.ext] || blob.type || "application/octet-stream";
+}
+function prepShare(it) {
+  if (shareState?.id === it.id && !shareState.err) return shareState;
+  const st = { id: it.id, file: null, err: null, pct: 0 };
+  let got = 0;
+  st.promise = fetchOriginal(it, () => { st.pct = Math.floor(++got / (it.chunks || 1) * 100); updateShareBtn(); })
+    .then(b => { st.file = new File([b], `${it.name}.${it.ext}`, { type: shareMime(it, b) }); })
+    .catch(e => { st.err = e; console.error(e); })
+    .finally(updateShareBtn);
+  shareState = st; updateShareBtn();
+  return st;
+}
+function updateShareBtn() {
+  if (!viewing) return;
+  const st = shareState && shareState.id === viewing.id ? shareState : null, btn = $("#vShare"), txt = $("#vShareTxt");
+  if (st?.file) { txt.textContent = "Compartir"; btn.disabled = false; }
+  else if (st?.err) { txt.textContent = "Reintentar compartir"; btn.disabled = false; }
+  else if (st) { txt.textContent = `Preparando ${st.pct}%`; btn.disabled = true; }
+  else { txt.textContent = `Preparar para compartir (${fmtSize(viewing.size)})`; btn.disabled = false; }
+}
+$("#vShare").onclick = async () => {
+  if (!viewing) return;
+  const st = shareState && shareState.id === viewing.id ? shareState : null;
+  if (!st?.file) { prepShare(viewing); return; }   // compartir debe ir directo del toque, así que primero se prepara
+  if (!navigator.canShare({ files: [st.file] })) { toast("Este tipo de archivo no se puede compartir desde aquí. Descárgalo."); return; }
+  try { await navigator.share({ files: [st.file], title: viewing.name }); }
+  catch (e) { if (e.name !== "AbortError") toast("No se pudo compartir"); }
+};
+
 /* ---------- visor ---------- */
 function openViewer(it) {
   viewing = it;
@@ -912,6 +958,8 @@ function openViewer(it) {
   const dims = it.width ? ` · ${it.width}×${it.height}` : "";
   $("#viewerInfo").textContent = `Subido el ${fmtDateLong(it.uploadedAt)} · ${fmtSize(it.size)}${dims}${it.kind === "video" && it.duration ? " · " + fmtDur(it.duration) : ""}`;
   $("#vCopy").hidden = it.kind !== "image";
+  $("#vShare").hidden = !canShareFiles;
+  if (canShareFiles) { if (it.size <= SHARE_AUTO_MAX) prepShare(it); updateShareBtn(); }
   $("#vOpen").hidden = !(it.kind === "file" && OPENABLE.test(it.type));
   $("#vOpen").href = url("raw", { id: it.id });
   $("#viewer").hidden = false;
