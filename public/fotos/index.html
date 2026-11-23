@@ -12,7 +12,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
-<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <script>
@@ -152,6 +153,30 @@
   .qthumb .fileic svg { width: 26px; } .qthumb .fileic b { font-size: 9.5px; padding: 0 4px; }
   .filebig { width: min(240px, 70vw); aspect-ratio: 1; position: relative; background: var(--surface-2); border-radius: 18px; flex-shrink: 0; }
   .filebig .fileic svg { max-width: 96px; } .filebig .fileic b { font-size: 15px; }
+  textarea { width: 100%; padding: 12px; border-radius: 11px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 14px/1.45 var(--f-mono); resize: vertical; min-height: 96px; }
+  textarea:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  .txtrow { display: flex; gap: 8px; align-items: center; }
+  .txtrow input { flex: 1; min-width: 0; }
+  .hdrow { display: flex; gap: 10px; align-items: center; }
+  .hdpill { flex-shrink: 0; min-width: 54px; height: 34px; border-radius: 99px; border: 1.5px solid var(--line); background: var(--surface); color: var(--muted);
+    font: 700 13px var(--f-mono); letter-spacing: .04em; cursor: pointer; }
+  .hdpill[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .hdrow .hint { flex: 1; }
+  .txtprev { position: absolute; inset: 0; padding: 44px 10px 10px; font: 11.5px/1.4 var(--f-mono); color: var(--fg); text-align: left; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere;
+    -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+  .linkprev { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; padding: 10px; color: var(--muted); }
+  .linkprev b { color: var(--fg); font: 600 13px var(--f-ui); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kindtag { position: absolute; left: 6px; bottom: 6px; background: var(--shade); color: #fff; border-radius: 6px; padding: 1px 6px; font: 600 11px var(--f-ui); }
+  .textview { width: min(720px, 100%); max-height: 56vh; overflow: auto; margin: 0; flex-shrink: 0; background: var(--surface); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px; font: 13.5px/1.5 var(--f-mono); white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+  .textview a { color: inherit; text-decoration: underline; }
+  .roundbtn.hdcam { font: 700 13px var(--f-mono); }
+  .keyout { font: 12px var(--f-mono) !important; }
+  details.guide { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  details.guide summary { font-weight: 600; cursor: pointer; }
+  details.guide ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; }
+  details.guide code { font: 12px var(--f-mono); background: var(--surface-2); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+  details.guide .cp { margin-left: 4px; padding: 2px 8px; font-size: 12px; border-radius: 7px; }
   .empty { text-align: center; color: var(--muted); padding: 40px 10px; border: 2px dashed var(--line); border-radius: 14px; }
 
   /* ---------- camera (siempre oscura, como la cámara del iPhone) ---------- */
@@ -165,7 +190,7 @@
     -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255,255,255,.14); }
   .camtop { position: absolute; z-index: 2; top: calc(10px + env(safe-area-inset-top, 0px));
     left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px));
-    display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 8px; }
+    display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto auto; gap: 8px; }
   .camtop label { display: grid; gap: 1px; padding: 6px 12px 7px; border-radius: 16px; min-width: 0; }
   .camtop label span { font: 600 10px var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); }
   .camtop input { width: 100%; border: 0; padding: 0; background: none; color: #fff; font: 600 15px var(--f-ui); outline: none; }
@@ -247,6 +272,10 @@
       </div>
     </div>
     <div class="panel">
+      <div class="hdrow">
+        <button type="button" class="hdpill" id="hdBtn" aria-pressed="false">HD</button>
+        <p class="hint" id="hdHint"></p>
+      </div>
       <label class="pick" for="files">
         <strong>Elegir fotos, videos o archivos</strong>
         <span>Puedes seleccionar varios a la vez</span>
@@ -255,7 +284,18 @@
       <div id="queue" class="queue"></div>
       <div class="bar" id="bar" hidden><div></div></div>
       <button id="uploadBtn" class="btn primary block" disabled>Subir</button>
-      <p class="hint" id="upHint" hidden>No cierres la app mientras sube. Los videos grandes tardan más.</p>
+      <p class="hint" id="upHint" hidden>No cierres la app mientras sube. Los videos se comprimen antes de subir y eso tarda un poco.</p>
+    </div>
+    <div class="panel">
+      <div class="field">
+        <label for="txtBody">Texto, link o código</label>
+        <textarea id="txtBody" rows="4" placeholder="Pega aquí un link, un tramo de código o cualquier texto…" spellcheck="false" autocapitalize="off"></textarea>
+      </div>
+      <div class="txtrow">
+        <input id="txtName" type="text" placeholder="Nombre (opcional)" autocomplete="off">
+        <button type="button" class="btn" id="txtPaste">Pegar</button>
+      </div>
+      <button id="txtSend" class="btn primary block" disabled>Enviar texto</button>
     </div>
   </section>
 
@@ -285,6 +325,7 @@
   <div class="camtop">
     <label class="glassdark" for="camFolder"><span>Carpeta</span><input id="camFolder" type="text" list="folderList" placeholder="Sin carpeta" autocomplete="off"></label>
     <label class="glassdark" for="camPrefix"><span>Nombre</span><input id="camPrefix" type="text" placeholder="Foto + hora" autocomplete="off"></label>
+    <button class="roundbtn glassdark hdcam" id="camHd" aria-label="HD: fotos sin comprimir" aria-pressed="false">HD</button>
     <button class="roundbtn glassdark" id="camTorch" aria-label="Linterna" aria-pressed="false" hidden>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>
     </button>
@@ -354,6 +395,20 @@
         <button type="button" data-mode="dark">Oscuro</button>
       </div>
     </div>
+    <div class="field"><span class="lbl">Atajo de iPhone</span>
+      <p class="hint">Clave para subir desde el botón Compartir del iPhone. Si cambias la contraseña, deja de servir y hay que generar otra.</p>
+      <div class="txtrow"><input id="keyOut" class="keyout" type="text" readonly placeholder="Toca Generar clave"><button type="button" class="btn" id="keyBtn">Generar clave</button></div>
+      <details class="guide">
+        <summary>Cómo armar los atajos</summary>
+        <ol>
+          <li>En Atajos crea uno nuevo, toca ⓘ y activa <b>Mostrar en hoja para compartir</b>.</li>
+          <li>Agrega <b>Obtener contenido de URL</b> con método <b>POST</b> y el encabezado <code>Authorization</code> = <code>Bearer</code> + espacio + tu clave.</li>
+          <li>Para fotos y archivos usa la URL <code>/api/quick?folder=Atajo&amp;name=…&amp;ext=…</code> con cuerpo <b>Archivo</b>. <button type="button" class="btn cp" data-copy="file">Copiar URL</button></li>
+          <li>Para textos y links usa <code>/api/quick?folder=Atajo</code> con cuerpo <b>JSON</b> y un campo <code>text</code>. <button type="button" class="btn cp" data-copy="text">Copiar URL</button></li>
+          <li>Límite por archivo en el atajo: 4 MB. Videos largos súbelos desde la app, que los comprime.</li>
+        </ol>
+      </details>
+    </div>
     <p class="hint">Sesión iniciada como <strong id="meUser"></strong>.</p>
     <div class="field"><label for="pwUser">Usuario</label><input id="pwUser" type="text" name="username" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
     <div class="field"><label for="pwCur">Contraseña actual</label><input id="pwCur" type="password" autocomplete="current-password" required></div>
@@ -375,6 +430,11 @@ const UPLOAD_PARALLEL = 3;
 const COPY_MAX_PX = 1280;   // tamaño de la imagen al copiar
 const MED_MAX_PX = 1600;    // vista previa grande
 const THUMB_MAX_PX = 400;   // miniatura de galería
+const IMG_MAX_PX = 2048, IMG_QUALITY = 0.82;      // fotos comprimidas (sin HD)
+const VIDEO_MAX_PX = 1920, VIDEO_MAX_FPS = 30;    // videos comprimidos (sin HD): máx. 1080p a 30 fps, H.264
+const VIDEO_BPP = 0.1;                            // bits por pixel por cuadro → ~6 Mbps en 1080p30
+let HD = false, camHD = false;
+const textCache = new Map();
 const KEEP_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const TABS = ["cam", "gal", "up"];
 const TITLES = { cam: "Cámara", gal: "Galería", up: "Subir" };
@@ -411,7 +471,16 @@ const FILE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const fileIcon = (ext) => `<span class="fileic">${FILE_SVG}<b>${esc((ext || "archivo").slice(0, 6))}</b></span>`;
 const kindOf = (f) => f.type.startsWith("video/") ? "video" : (f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name)) ? "image" : "file";
 const extOfName = (n) => ((n.match(/\.([a-z0-9]{1,6})$/i) || [])[1] || "").toLowerCase();
-const OPENABLE = /^(image\/|video\/|audio\/|application\/pdf$|text\/plain$)/i;
+const OPENABLE = /^(image\/|video\/|audio\/|application\/pdf$|text\/plain(;|$))/i;
+const isLink = (t) => /^https?:\/\/\S+$/i.test((t || "").trim());
+const hostOf = (t) => { try { return new URL(t.trim()).hostname.replace(/^www\./, ""); } catch { return "Link"; } };
+const linkify = (t) => esc(t).replace(/https?:\/\/[^\s<"]+/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+const LINK_SVG = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+function autoTextName(t) {
+  t = t.trim();
+  if (isLink(t)) return "Link " + hostOf(t);
+  return cleanName(t.split("\n")[0].slice(0, 50), "Texto");
+}
 const url = (route, params = {}) => `/api/${route}?` + new URLSearchParams({ ...params, t: TOKEN });
 
 async function api(route, { method = "GET", body, json, query } = {}) {
@@ -477,7 +546,22 @@ function showApp() {
 }
 
 /* ---------- cuenta ---------- */
-$("#openSettings").onclick = () => { $("#meUser").textContent = ME; $("#pwUser").value = ME; $("#pwErr").hidden = true; $("#settings").hidden = false; };
+$("#keyBtn").onclick = async () => {
+  const out = $("#keyOut");
+  if (out.value) {
+    try { await navigator.clipboard.writeText(out.value); toast("Clave copiada. Pégala en el atajo."); }
+    catch { out.select(); toast("Selecciona la clave y cópiala"); }
+    return;
+  }
+  try { const d = await api("apptoken", { method: "POST", json: {} }); out.value = d.token; $("#keyBtn").textContent = "Copiar"; }
+  catch (e) { toast(e.message); }
+};
+document.querySelectorAll("details.guide [data-copy]").forEach(b => b.onclick = async () => {
+  const base = location.origin + "/api/quick?folder=Atajo";
+  const u = b.dataset.copy === "file" ? base + "&name=" : base;
+  try { await navigator.clipboard.writeText(u); toast("URL copiada"); } catch { toast(u, 6000); }
+});
+$("#openSettings").onclick = () => { $("#keyOut").value = ""; $("#keyBtn").textContent = "Generar clave"; $("#meUser").textContent = ME; $("#pwUser").value = ME; $("#pwErr").hidden = true; $("#settings").hidden = false; };
 $("#closeSettings").onclick = () => { $("#settings").hidden = true; };
 $("#settings").onclick = (e) => { if (e.target.id === "settings") $("#settings").hidden = true; };
 $("#logout").onclick = logout;
@@ -502,7 +586,7 @@ function setTab(t) {
   $("#paneUp").hidden = t !== "up"; $("#paneGal").hidden = t !== "gal"; $("#paneCam").hidden = t !== "cam";
   $("#paneTitle").textContent = TITLES[t];
   document.body.style.overflow = t === "cam" ? "hidden" : "";
-  if (t === "cam") startCam(); else stopCam();
+  if (t === "cam") startCam(); else { stopCam(); if (camHD) setCamHd(false); }
   if (t === "gal" && TOKEN) loadGallery(true);
   syncThemeChrome();
 }
@@ -516,50 +600,107 @@ function loadImage(blob) {
     i.src = u;
   });
 }
-function drawScaled(src, w, h, maxPx) {
+function drawScaled(src, w, h, maxPx, fill) {
   const s = Math.min(1, maxPx / Math.max(w, h));
   const c = document.createElement("canvas");
   c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
-  c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+  const ctx = c.getContext("2d");
+  if (fill) { ctx.fillStyle = fill; ctx.fillRect(0, 0, c.width, c.height); }  // JPG no tiene transparencia
+  ctx.drawImage(src, 0, 0, c.width, c.height);
   return c;
 }
 const canvasBlob = (c, type, q) => new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("No se pudo procesar")), type, q));
 
-async function processImage(file) {
+// Sin HD: la foto se reduce a 2048 px y JPG 82% (se ve igual en pantalla y pesa ~5-10 veces menos).
+// Con HD: se sube el original (solo HEIC se pasa a JPG para que Windows lo abra).
+async function processImage(file, hd) {
   const img = await loadImage(file);
   const w = img.naturalWidth, h = img.naturalHeight;
-  let original = file, type = file.type;
-  if (!KEEP_TYPES.includes(file.type)) {
-    // HEIC u otro formato → JPG para que Windows lo abra (respeta el límite de canvas de iOS)
-    const maxSide = Math.sqrt(16_000_000 * (Math.max(w, h) / Math.min(w, h)));
-    original = await canvasBlob(drawScaled(img, w, h, Math.min(Math.max(w, h), maxSide)), "image/jpeg", 0.92);
-    type = "image/jpeg";
+  let out = file, type = file.type, ow = w, oh = h;
+  const keep = KEEP_TYPES.includes(file.type);
+  if (hd) {
+    if (!keep) {
+      const maxSide = Math.sqrt(16_000_000 * (Math.max(w, h) / Math.min(w, h)));  // límite de canvas de iOS
+      const c = drawScaled(img, w, h, Math.min(Math.max(w, h), maxSide), "#fff");
+      out = await canvasBlob(c, "image/jpeg", 0.92); type = "image/jpeg"; ow = c.width; oh = c.height;
+    }
+  } else if (file.type !== "image/gif") {   // los GIF se dejan igual para no perder la animación
+    const c = drawScaled(img, w, h, IMG_MAX_PX, "#fff");
+    const jpg = await canvasBlob(c, "image/jpeg", IMG_QUALITY);
+    if (!keep || jpg.size < file.size * 0.9) { out = jpg; type = "image/jpeg"; ow = c.width; oh = c.height; }
   }
-  const thumb = await canvasBlob(drawScaled(img, w, h, THUMB_MAX_PX), "image/jpeg", 0.74);
-  const med = await canvasBlob(drawScaled(img, w, h, MED_MAX_PX), "image/jpeg", 0.82);
+  const thumb = await canvasBlob(drawScaled(img, w, h, THUMB_MAX_PX, "#fff"), "image/jpeg", 0.74);
+  const med = await canvasBlob(drawScaled(img, w, h, MED_MAX_PX, "#fff"), "image/jpeg", 0.82);
   URL.revokeObjectURL(img.src);
-  return { blob: original, type, thumb, med, width: w, height: h };
+  return { blob: out, type, thumb, med, width: ow, height: oh, compressed: out !== file && out.size < file.size ? { from: file.size, to: out.size } : null };
 }
 
-function processVideo(file) {
+function videoThumb(src) {
   return new Promise((resolve) => {
     const v = document.createElement("video");
-    const u = URL.createObjectURL(file);
     let settled = false;
     const done = async (ok) => {
       if (settled) return; settled = true;
       let thumb = null;
       try { if (ok && v.videoWidth) thumb = await canvasBlob(drawScaled(v, v.videoWidth, v.videoHeight, THUMB_MAX_PX), "image/jpeg", 0.74); } catch {}
-      resolve({ blob: file, type: file.type || "video/quicktime", thumb, med: null, duration: v.duration || 0, width: v.videoWidth, height: v.videoHeight });
-      URL.revokeObjectURL(u);
+      resolve({ thumb, duration: isFinite(v.duration) ? v.duration : 0, width: v.videoWidth, height: v.videoHeight });
+      v.removeAttribute("src"); v.load();
     };
     v.muted = true; v.playsInline = true; v.preload = "auto";
     v.onloadeddata = () => { v.currentTime = Math.min(0.5, (v.duration || 1) / 3); };
     v.onseeked = () => done(true);
     v.onerror = () => done(false);
-    setTimeout(() => done(!!v.videoWidth), 8000);
-    v.src = u; v.load();
+    setTimeout(() => done(!!v.videoWidth), 10000);
+    v.src = src; v.load();
   });
+}
+async function processVideo(file) {
+  const u = URL.createObjectURL(file);
+  const t = await videoThumb(u);
+  URL.revokeObjectURL(u);
+  return { blob: file, type: file.type || "video/quicktime", med: null, ...t };
+}
+
+// Comprime el video en el propio cel/compu antes de subirlo (WebCodecs): H.264 a máx. 1080p y 30 fps.
+// Si el navegador no puede, o el resultado no ahorra al menos 30%, regresa null y se sube el original.
+let mbPromise = null;
+const loadMB = () => (mbPromise ||= import("/vendor/mediabunny-1.65.2.min.mjs"));
+async function compressVideo(file, onPct) {
+  if (!self.VideoEncoder || !self.VideoDecoder) return null;
+  const MB = await loadMB();
+  const input = new MB.Input({ source: new MB.BlobSource(file), formats: MB.ALL_FORMATS });
+  try {
+    const vt = await input.getPrimaryVideoTrack();
+    if (!vt || !(await vt.canDecode())) return null;
+    const at = await input.getPrimaryAudioTrack();
+    const duration = await input.computeDuration();
+    if (!(duration > 0)) return null;
+    const dw = await vt.getDisplayWidth(), dh = await vt.getDisplayHeight();
+    const stats = await vt.computePacketStats(120);
+    const srcFps = stats.averagePacketRate || 30;
+    const fps = Math.min(VIDEO_MAX_FPS, Math.round(srcFps));
+    const scale = Math.min(1, VIDEO_MAX_PX / Math.max(dw, dh));
+    const even = (x) => Math.max(2, Math.round(x / 2) * 2);
+    const ow = even(dw * scale), oh = even(dh * scale);
+    const srcBitrate = file.size * 8 / duration;
+    const bitrate = Math.round(Math.min(ow * oh * fps * VIDEO_BPP, srcBitrate * 0.75));
+    const estimate = (bitrate + (at ? 160_000 : 0)) * duration / 8;
+    if (estimate > file.size * 0.6) return null;               // ya viene ligero: no se re-comprime para no perder calidad
+    if (!(await MB.canEncodeVideo("avc", { width: ow, height: oh, bitrate }))) return null;
+    const output = new MB.Output({ format: new MB.Mp4OutputFormat({ fastStart: "in-memory" }), target: new MB.BufferTarget() });
+    const conv = await MB.Conversion.init({
+      input, output, tracks: "primary",
+      video: { width: ow, height: oh, fit: "fill", codec: "avc", bitrate, keyFrameInterval: 2, forceTranscode: true,
+        ...(srcFps > VIDEO_MAX_FPS + 1 ? { frameRate: fps } : {}) },
+    });
+    const lost = conv.discardedTracks.filter(d => d.track === vt || (at && d.track === at));
+    if (!conv.isValid || lost.length) { console.warn("No se comprime:", lost.map(d => d.reason)); return null; }
+    conv.onProgress = (p) => onPct(Math.min(99, Math.round(p * 100)));
+    await conv.execute();
+    const buf = output.target.buffer;
+    if (!buf || buf.byteLength > file.size * 0.7) return null;
+    return { blob: new Blob([buf], { type: "video/mp4" }), width: ow, height: oh, duration };
+  } finally { try { input.dispose?.(); } catch {} }
 }
 
 /* ---------- carpeta compartida (Subir y Cámara) ---------- */
@@ -607,6 +748,7 @@ function renderQueue() {
 }
 function setQ(q, status, label) {
   q.status = status; q.label = label;
+  if (q.silent) return;
   if (!queue.includes(q)) { renderCamStatus(); return; }   // fotos de la cámara
   const row = $("#queue").children[queue.indexOf(q)];
   const st = row && row.querySelector(".st");
@@ -625,13 +767,23 @@ async function uploadOne(q, folder, onBytes) {
   setQ(q, "busy", "preparando");
   const asFile = () => ({ blob: q.file, type: q.file.type || "application/octet-stream", thumb: null, med: null });
   let p;
-  if (q.kind === "video") p = await (q.prepared || processVideo(q.file));
-  else if (q.kind === "image") { try { p = await processImage(q.file); } catch { q.kind = "file"; p = asFile(); } } // formato de imagen que el navegador no lee
+  if (q.kind === "video") {
+    p = await (q.prepared || processVideo(q.file));
+    if (!q.hd) {
+      setQ(q, "busy", "comprimiendo");
+      try {
+        const c = await compressVideo(q.file, (pct) => setQ(q, "busy", `comprimiendo ${pct}%`));
+        if (c) p = { ...p, blob: c.blob, type: "video/mp4", width: c.width, height: c.height, compressed: { from: q.file.size, to: c.blob.size } };
+      } catch (e) { console.warn("No se pudo comprimir el video, se sube el original", e); }
+    }
+  }
+  else if (q.kind === "image") { try { p = await processImage(q.file, q.hd); } catch { q.kind = "file"; p = asFile(); } } // formato de imagen que el navegador no lee
+  else if (q.kind === "text") p = { blob: q.file, type: "text/plain;charset=utf-8", thumb: null, med: null };
   else p = asFile();
-  const blob = p.blob;
+  const blob = p.blob, scale = q.file.size / (blob.size || 1);
   const created = await api("items", { method: "POST", json: {
     name: cleanName(q.name, stripExt(q.file.name)), folder, kind: q.kind, type: p.type, ext: extFor(q.file, p.type),
-    size: blob.size, duration: p.duration, width: p.width, height: p.height } });
+    size: blob.size, duration: p.duration, width: p.width, height: p.height, preview: q.kind === "text" ? (q.text || "").slice(0, 300) : undefined } });
   const { id, chunkSize, chunks } = created;
   let next = 0, sent = 0;
   const worker = async () => {
@@ -639,7 +791,7 @@ async function uploadOne(q, folder, onBytes) {
       const n = next++;
       const part = blob.slice(n * chunkSize, Math.min(blob.size, (n + 1) * chunkSize));
       await putWithRetry("chunk", { id, n }, part);
-      sent += part.size; onBytes(part.size);
+      sent += part.size; onBytes(part.size * scale);
       setQ(q, "busy", `${Math.floor(sent / blob.size * 100)}%`);
     }
   };
@@ -647,6 +799,8 @@ async function uploadOne(q, folder, onBytes) {
   if (p.thumb) await putWithRetry("thumb", { id }, p.thumb);
   if (p.med) await putWithRetry("med", { id }, p.med);
   await api("complete", { method: "POST", json: { id, hasThumb: !!p.thumb, hasMed: !!p.med } });
+  if (q.kind === "text") textCache.set(id, q.text);
+  return p;
 }
 
 $("#uploadBtn").onclick = async () => {
@@ -656,21 +810,71 @@ $("#uploadBtn").onclick = async () => {
   let doneBytes = 0, fails = 0;
   $("#bar").hidden = false; $("#upHint").hidden = false;
   let wakeLock = null; try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
+  let saved = 0;
   for (const q of todo) {
+    if (q.hd == null) q.hd = HD;
     try {
-      await uploadOne(q, folder, (b) => { doneBytes += b; $("#bar").firstElementChild.style.width = Math.min(100, doneBytes / totalBytes * 100) + "%"; });
-      setQ(q, "ok", "✓ listo");
+      const p = await uploadOne(q, folder, (b) => { doneBytes += b; $("#bar").firstElementChild.style.width = Math.min(100, doneBytes / totalBytes * 100) + "%"; });
+      if (p.compressed) saved += p.compressed.from - p.compressed.to;
+      setQ(q, "ok", p.compressed ? `✓ ${fmtSize(p.compressed.to)}` : "✓ listo");
     } catch (e) { console.error(e); fails++; setQ(q, "err", "error"); }
   }
   try { wakeLock?.release(); } catch {}
   setTimeout(() => { $("#bar").hidden = true; $("#upHint").hidden = true; $("#bar").firstElementChild.style.width = "0"; }, 700);
   if (fails) toast(`${todo.length - fails} subidos, ${fails} con error. Toca Subir para reintentar.`, 4500);
   else {
-    toast(`${todo.length} archivo${todo.length > 1 ? "s" : ""} en “${folder}”`);
-    setTimeout(() => { queue.forEach(q => q.preview && URL.revokeObjectURL(q.preview)); queue = []; $("#baseName").value = ""; renderQueue(); }, 1200);
+    toast(`${todo.length} archivo${todo.length > 1 ? "s" : ""} en “${folder}”${saved > 0 ? ` · ahorraste ${fmtSize(saved)}` : ""}`, 3500);
+    setTimeout(() => { queue.forEach(q => q.preview && URL.revokeObjectURL(q.preview)); queue = []; $("#baseName").value = ""; setHd(false); renderQueue(); }, 1800);
   }
   loadGallery(true);
 };
+
+/* ---------- HD (subir original sin comprimir) ---------- */
+function setHd(v) {
+  HD = v; $("#hdBtn").setAttribute("aria-pressed", v);
+  $("#hdHint").textContent = v ? "HD activado: se sube el original, sin comprimir. Gasta más datos."
+    : "Fotos y videos se comprimen antes de subir para ahorrar datos. Activa HD para subir el original.";
+}
+$("#hdBtn").onclick = () => setHd(!HD);
+setHd(false);
+function setCamHd(v) { camHD = v; $("#camHd").setAttribute("aria-pressed", v); }
+$("#camHd").onclick = () => { setCamHd(!camHD); toast(camHD ? "HD: las fotos se suben sin comprimir" : "Fotos comprimidas"); };
+
+/* ---------- enviar texto ---------- */
+$("#txtBody").oninput = () => { $("#txtSend").disabled = !$("#txtBody").value.trim(); };
+$("#txtPaste").onclick = async () => {
+  try { const t = await navigator.clipboard.readText(); if (t) { $("#txtBody").value = t; $("#txtBody").oninput(); } }
+  catch { toast("Mantén presionado el cuadro de texto y elige Pegar"); $("#txtBody").focus(); }
+};
+$("#txtSend").onclick = async () => {
+  const text = $("#txtBody").value;
+  if (!text.trim()) return;
+  const name = cleanName($("#txtName").value, autoTextName(text)), folder = folderVal(), btn = $("#txtSend");
+  const q = { file: new File([text], name + ".txt", { type: "text/plain;charset=utf-8" }), kind: "text", name, text, silent: true, status: "", label: "" };
+  btn.disabled = true; btn.textContent = "Enviando…";
+  try {
+    await uploadOne(q, folder, () => {});
+    $("#txtBody").value = ""; $("#txtName").value = "";
+    toast(`Texto enviado a “${folder}”`); loadGallery(true);
+  } catch (e) { console.error(e); toast("No se pudo enviar. Revisa tu conexión e intenta de nuevo."); }
+  finally { btn.textContent = "Enviar texto"; btn.disabled = !$("#txtBody").value.trim(); }
+};
+async function fetchText(it) {
+  if (textCache.has(it.id)) return textCache.get(it.id);
+  const t = await (await fetchOriginal(it)).text();
+  textCache.set(it.id, t); return t;
+}
+async function copyText(it, btn) {
+  const old = btn?.textContent;
+  const full = textCache.get(it.id) ?? (new TextEncoder().encode(it.preview || "").length === it.size ? it.preview : null);
+  try {
+    if (full != null) await navigator.clipboard.writeText(full);
+    else await navigator.clipboard.write([new ClipboardItem({ "text/plain": fetchText(it).then(t => new Blob([t], { type: "text/plain" })) })]);
+    if (btn) btn.textContent = "✓ Copiado";
+    toast("Texto copiado");
+  } catch (e) { console.error(e); toast("No se pudo copiar. Ábrelo y selecciona el texto."); }
+  if (btn) setTimeout(() => { btn.textContent = old; }, 1600);
+}
 
 /* ---------- cámara ---------- */
 let camStream = null, camFacing = "environment", camStarting = false, torchOn = false;
@@ -735,7 +939,7 @@ function addCamShot(file, name) {
   const preview = URL.createObjectURL(file);
   const img = $("#lastShotImg"); img.src = preview; img.hidden = false;
   const ls_ = $("#lastShot"); ls_.classList.remove("pop"); void ls_.offsetWidth; ls_.classList.add("pop");
-  camShots.push({ file, kind: "image", name, status: "", label: "" });
+  camShots.push({ file, kind: "image", name, hd: camHD, status: "", label: "" });
   renderCamStatus(); runCamUploads();
 }
 async function runCamUploads() {
@@ -772,7 +976,40 @@ async function loadGallery(silent) {
     const ids = new Set(items.map(i => i.id));
     selected = new Set([...selected].filter(k => ids.has(k)));
     renderGallery();
+    queueThumbs();
   } catch (e) { if (!silent) toast(e.message); }
+}
+// Lo que llega por el atajo de iPhone no trae miniatura: la primera vez que abres la galería se genera aquí y se guarda.
+const thumbTried = new Set(); let thumbBusy = 0;
+function queueThumbs() {
+  for (const it of items) {
+    if (thumbBusy >= 2) return;
+    if ((it.kind === "image" || it.kind === "video") && !it.hasThumb && !thumbTried.has(it.id)) {
+      thumbTried.add(it.id); thumbBusy++;
+      makeThumb(it).finally(() => { thumbBusy--; queueThumbs(); });
+    }
+  }
+}
+async function makeThumb(it) {
+  try {
+    let patch;
+    if (it.kind === "image") {
+      const img = await loadImage(await fetchOriginal(it));
+      const w = img.naturalWidth, h = img.naturalHeight;
+      await putWithRetry("thumb", { id: it.id }, await canvasBlob(drawScaled(img, w, h, THUMB_MAX_PX, "#fff"), "image/jpeg", 0.74));
+      await putWithRetry("med", { id: it.id }, await canvasBlob(drawScaled(img, w, h, MED_MAX_PX, "#fff"), "image/jpeg", 0.82));
+      URL.revokeObjectURL(img.src);
+      patch = { hasThumb: true, hasMed: true, width: w, height: h };
+    } else {
+      const t = await videoThumb(url("raw", { id: it.id }));
+      if (!t.thumb) return;
+      await putWithRetry("thumb", { id: it.id }, t.thumb);
+      patch = { hasThumb: true, width: t.width, height: t.height, duration: t.duration };
+    }
+    const d = await api("item", { method: "PATCH", json: { id: it.id, ...patch } });
+    Object.assign(it, d.item);
+    if (currentTab === "gal" && $("#viewer").hidden) renderGallery();
+  } catch (e) { console.warn("Sin miniatura para", it.name, e); }
 }
 function groups() {
   const g = new Map();
@@ -782,7 +1019,7 @@ function groups() {
 function renderGallery() {
   $("#folderList").innerHTML = [...new Set(items.map(i => i.folder))].map(f => `<option value="${esc(f)}">`).join("");
   const el = $("#gallery"); el.innerHTML = "";
-  if (!items.length) { el.innerHTML = '<div class="empty">Aún no hay nada.<br>Toma fotos con la Cámara o sube fotos, videos y archivos en Subir.</div>'; updateSel(); return; }
+  if (!items.length) { el.innerHTML = '<div class="empty">Aún no hay nada.<br>Toma fotos con la Cámara o sube fotos, videos, archivos y textos en Subir.</div>'; updateSel(); return; }
   for (const [folder, list] of groups()) {
     const sec = document.createElement("section"); sec.className = "folder";
     sec.innerHTML = `<div class="fhead"><h2>${esc(folder)}</h2><span class="n">${list.length}</span>
@@ -797,15 +1034,17 @@ function renderGallery() {
       const on = selected.has(it.id);
       const t = document.createElement("div"); t.className = "tile" + (on ? " sel" : "");
       t.innerHTML = `<button class="pic" aria-label="Abrir ${esc(it.name)}">
-          ${it.hasThumb ? `<img loading="lazy" src="${url("thumb", { id: it.id })}" alt="">` : it.kind === "file" ? fileIcon(it.ext) : `<span class="noimg">${it.kind === "video" ? "Video" : "Sin vista previa"}</span>`}
+          ${it.hasThumb ? `<img loading="lazy" src="${url("thumb", { id: it.id })}" alt="">` : it.kind === "file" ? fileIcon(it.ext)
+            : it.kind === "text" ? (isLink(it.preview) ? `<span class="linkprev">${LINK_SVG}<b>${esc(hostOf(it.preview))}</b></span>` : `<span class="txtprev">${esc(it.preview || "")}</span><span class="kindtag">Texto</span>`)
+            : `<span class="noimg">${it.kind === "video" ? "Video" : "Sin vista previa"}</span>`}
           ${it.kind === "video" ? `<span class="vb">▶ ${it.duration ? fmtDur(it.duration) : ""}</span>` : ""}
         </button>
         <button class="ck" aria-label="Seleccionar" aria-pressed="${on}">${on ? "✓" : ""}</button>
-        ${it.kind === "image" ? '<button class="tcopy">Copiar</button>' : ""}
-        <div class="tinfo"><span class="nm" title="${esc(it.name)}">${esc(it.name)}</span><span class="dt">${fmtDate(it.uploadedAt)}${it.kind === "file" ? " · " + fmtSize(it.size) : ""}</span></div>`;
+        ${it.kind === "image" || it.kind === "text" ? '<button class="tcopy">Copiar</button>' : ""}
+        <div class="tinfo"><span class="nm" title="${esc(it.name)}">${esc(it.name)}</span><span class="dt">${fmtDate(it.uploadedAt)}${it.kind === "file" || it.kind === "text" ? " · " + fmtSize(it.size) : ""}</span></div>`;
       t.querySelector(".pic").onclick = () => openViewer(it);
       t.querySelector(".ck").onclick = () => { on ? selected.delete(it.id) : selected.add(it.id); renderGallery(); };
-      const c = t.querySelector(".tcopy"); if (c) c.onclick = () => copyImage(it, c);
+      const c = t.querySelector(".tcopy"); if (c) c.onclick = () => it.kind === "text" ? copyText(it, c) : copyImage(it, c);
       grid.appendChild(t);
     }
     el.appendChild(sec);
@@ -932,6 +1171,10 @@ function prepShare(it) {
 }
 function updateShareBtn() {
   if (!viewing) return;
+  if (viewing.kind === "text") {
+    const ready = textCache.has(viewing.id);
+    $("#vShareTxt").textContent = ready ? "Compartir" : "Cargando…"; $("#vShare").disabled = !ready; return;
+  }
   const st = shareState && shareState.id === viewing.id ? shareState : null, btn = $("#vShare"), txt = $("#vShareTxt");
   if (st?.file) { txt.textContent = "Compartir"; btn.disabled = false; }
   else if (st?.err) { txt.textContent = "Reintentar compartir"; btn.disabled = false; }
@@ -940,6 +1183,12 @@ function updateShareBtn() {
 }
 $("#vShare").onclick = async () => {
   if (!viewing) return;
+  if (viewing.kind === "text") {
+    const t = textCache.get(viewing.id); if (t == null) return;
+    try { await navigator.share(isLink(t) ? { url: t.trim(), title: viewing.name } : { text: t, title: viewing.name }); }
+    catch (e) { if (e.name !== "AbortError") toast("No se pudo compartir"); }
+    return;
+  }
   const st = shareState && shareState.id === viewing.id ? shareState : null;
   if (!st?.file) { prepShare(viewing); return; }   // compartir debe ir directo del toque, así que primero se prepara
   if (!navigator.canShare({ files: [st.file] })) { toast("Este tipo de archivo no se puede compartir desde aquí. Descárgalo."); return; }
@@ -951,15 +1200,23 @@ $("#vShare").onclick = async () => {
 function openViewer(it) {
   viewing = it;
   const box = $("#viewerMedia");
-  box.innerHTML = it.kind === "file" ? `<div class="filebig">${fileIcon(it.ext)}</div>` : it.kind === "video"
+  box.innerHTML = it.kind === "text" ? `<pre class="textview" id="textView">Cargando…</pre>` : it.kind === "file" ? `<div class="filebig">${fileIcon(it.ext)}</div>` : it.kind === "video"
     ? `<video class="media" controls playsinline preload="metadata" ${it.hasThumb ? `poster="${url("thumb", { id: it.id })}"` : ""} src="${url("raw", { id: it.id })}"></video>`
     : `<img class="media" alt="${esc(it.name)}" src="${it.hasMed ? url("med", { id: it.id }) : url("thumb", { id: it.id })}">`;
   $("#editName").value = it.name; $("#editFolder").value = it.folder || "";
   const dims = it.width ? ` · ${it.width}×${it.height}` : "";
   $("#viewerInfo").textContent = `Subido el ${fmtDateLong(it.uploadedAt)} · ${fmtSize(it.size)}${dims}${it.kind === "video" && it.duration ? " · " + fmtDur(it.duration) : ""}`;
-  $("#vCopy").hidden = it.kind !== "image";
-  $("#vShare").hidden = !canShareFiles;
-  if (canShareFiles) { if (it.size <= SHARE_AUTO_MAX) prepShare(it); updateShareBtn(); }
+  $("#vCopy").hidden = it.kind !== "image" && it.kind !== "text";
+  $("#vCopy").textContent = it.kind === "text" ? "Copiar texto" : "Copiar imagen";
+  if (it.kind === "text") {
+    $("#vShare").hidden = !navigator.share;
+    fetchText(it).then(t => { if (viewing?.id === it.id) { $("#textView").innerHTML = linkify(t); updateShareBtn(); } })
+      .catch(() => { if (viewing?.id === it.id) $("#textView").textContent = "No se pudo cargar el texto."; });
+    updateShareBtn();
+  } else {
+    $("#vShare").hidden = !canShareFiles;
+    if (canShareFiles) { if (it.size <= SHARE_AUTO_MAX) prepShare(it); updateShareBtn(); }
+  }
   $("#vOpen").hidden = !(it.kind === "file" && OPENABLE.test(it.type));
   $("#vOpen").href = url("raw", { id: it.id });
   $("#viewer").hidden = false;
@@ -983,7 +1240,7 @@ $("#editSave").onclick = async () => {
   } catch (e) { toast(e.message); }
   finally { $("#editSave").disabled = false; }
 };
-$("#vCopy").onclick = (e) => viewing && copyImage(viewing, e.currentTarget);
+$("#vCopy").onclick = (e) => viewing && (viewing.kind === "text" ? copyText(viewing, e.currentTarget) : copyImage(viewing, e.currentTarget));
 $("#vDown").onclick = async (e) => {
   if (!viewing) return;
   const btn = e.currentTarget, it = viewing, old = btn.textContent; btn.disabled = true; let got = 0;

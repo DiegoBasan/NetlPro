@@ -74,9 +74,9 @@ async function checkPassword(user: string, pass: string) {
   const h = scryptSync(pass, Buffer.from(c.salt!, "base64"), 32).toString("base64");
   return safeEq(h, c.hash!);
 }
-async function issueToken() {
+async function issueToken(days = TOKEN_DAYS) {
   const c = await getCreds();
-  const payload = b64url(JSON.stringify({ g: c.gen, exp: Date.now() + TOKEN_DAYS * 864e5 }));
+  const payload = b64url(JSON.stringify({ g: c.gen, exp: Date.now() + days * 864e5 }));
   return `${payload}.${sign(payload)}`;
 }
 async function validToken(tok: string) {
@@ -91,13 +91,32 @@ async function validToken(tok: string) {
 
 /* ---------- items ---------- */
 type Item = {
-  id: string; name: string; folder: string; kind: "image" | "video" | "file"; type: string; ext: string;
+  id: string; name: string; folder: string; kind: "image" | "video" | "file" | "text"; type: string; ext: string; preview?: string;
   size: number; chunks: number; uploadedAt: number; complete: boolean;
   hasThumb?: boolean; hasMed?: boolean; duration?: number; width?: number; height?: number;
 };
 const itemKey = (id: string) => `items/${id}`;
 const getItem = async (id: string) => (await store().get(itemKey(id), { type: "json" })) as Item | null;
 const validId = (id: string | null) => !!id && /^[a-z0-9-]{8,60}$/i.test(id);
+const KINDS = ["image", "video", "file", "text"] as const;
+const kindFromExt = (ext: string) =>
+  /^(jpe?g|png|heic|heif|gif|webp|bmp|tiff?)$/.test(ext) ? "image" : /^(mov|mp4|m4v|webm|3gp|avi|mkv)$/.test(ext) ? "video" : ext === "txt" ? "text" : "file";
+const MIME: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", heic: "image/heic", heif: "image/heif", gif: "image/gif", webp: "image/webp",
+  mov: "video/quicktime", mp4: "video/mp4", m4v: "video/x-m4v", webm: "video/webm", pdf: "application/pdf", txt: "text/plain;charset=utf-8", csv: "text/csv" };
+const textPreview = (t: string) => t.replace(/\s+$/g, "").slice(0, 300);
+
+// guarda un archivo completo (ya en memoria) partido en partes, y lo deja listo en la galería
+async function storeWhole(data: Uint8Array, meta: Partial<Item> & { name: string; folder: string; kind: Item["kind"]; type: string; ext: string }) {
+  const s = store();
+  const it: Item = {
+    id: `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`, ...meta,
+    size: data.byteLength, chunks: Math.max(1, Math.ceil(data.byteLength / CHUNK)), uploadedAt: Date.now(), complete: false,
+  } as Item;
+  for (let n = 0; n < it.chunks; n++) await s.set(`data/${it.id}/${n}`, data.slice(n * CHUNK, (n + 1) * CHUNK));
+  it.complete = true;
+  await s.setJSON(itemKey(it.id), it);
+  return it;
+}
 
 async function removeItem(it: Item) {
   const s = store();
@@ -136,6 +155,41 @@ export default async (req: Request) => {
 
     if (route === "me") return json({ user: (await getCreds()).user });
 
+    // clave de larga duración para el atajo de iPhone (se invalida si cambias la contraseña)
+    if (route === "apptoken" && req.method === "POST") return json({ token: await issueToken(3650) });
+
+    // subida rápida en una sola petición (atajo de iPhone): texto en JSON o archivo crudo (máx. ~4 MB)
+    if (route === "quick" && req.method === "POST") {
+      const ctype = req.headers.get("content-type") || "";
+      const folder = clean(q("folder"), "Atajo");
+      if (/json/i.test(ctype)) {
+        const b = (await req.json().catch(() => ({}))) as any;
+        const text = String(b.text ?? b.texto ?? "").slice(0, 2_000_000);
+        if (!text.trim()) return json({ error: "Texto vacío" }, 400);
+        const t = text.trim(), firstLine = t.split("\n")[0].slice(0, 60);
+        let auto = clean(firstLine, "Texto");
+        if (/^https?:\/\/\S+$/i.test(t)) { try { auto = "Link " + new URL(t).hostname.replace(/^www\./, ""); } catch {} }
+        const it = await storeWhole(new TextEncoder().encode(text), {
+          name: clean(b.name || q("name"), auto), folder: clean(b.folder, folder),
+          kind: "text", type: MIME.txt, ext: "txt", preview: textPreview(text),
+        });
+        return json({ ok: true, id: it.id, name: it.name });
+      }
+      const data = new Uint8Array(await req.arrayBuffer());
+      if (!data.byteLength) return json({ error: "Archivo vacío" }, 400);
+      let ext = clean(q("ext"), "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
+      let name = clean(q("name"), "");
+      const m = name.match(/^(.*)\.([a-z0-9]{1,6})$/i);
+      if (m && !ext) { name = m[1]; ext = m[2].toLowerCase(); } else if (m && m[2].toLowerCase() === ext) name = m[1];
+      if (!ext) ext = (Object.entries(MIME).find(([, v]) => ctype.startsWith(v.split(";")[0]))?.[0]) || "bin";
+      const kind = kindFromExt(ext);
+      const type = MIME[ext] || (ctype && !/form|octet/i.test(ctype) ? ctype.slice(0, 80) : "application/octet-stream");
+      const meta: any = { name: name || (kind === "image" ? "Foto" : kind === "video" ? "Video" : "Archivo"), folder, kind, type, ext };
+      if (kind === "text") { const t = new TextDecoder().decode(data); meta.preview = textPreview(t); }
+      const it = await storeWhole(data, meta);
+      return json({ ok: true, id: it.id, name: it.name });
+    }
+
     // cambiar usuario/contraseña (invalida sesiones viejas)
     if (route === "password" && req.method === "POST") {
       const { current, user, pass } = (await req.json()) as any;
@@ -172,7 +226,8 @@ export default async (req: Request) => {
       const it: Item = {
         id: `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`,
         name: clean(b.name, "archivo"), folder: clean(b.folder, "Sin carpeta"),
-        kind: b.kind === "video" ? "video" : b.kind === "file" ? "file" : "image",
+        kind: (KINDS as readonly string[]).includes(b.kind) ? b.kind : "image",
+        preview: b.kind === "text" ? textPreview(String(b.preview || "")) : undefined,
         type: String(b.type || "application/octet-stream").slice(0, 80),
         ext: clean(b.ext, "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "bin",
         size, chunks: Math.ceil(size / CHUNK), uploadedAt: Date.now(), complete: false,
@@ -214,11 +269,15 @@ export default async (req: Request) => {
 
     // renombrar / mover de carpeta
     if (route === "item" && req.method === "PATCH") {
-      const { id, name, folder } = (await req.json()) as any;
+      const { id, name, folder, hasThumb, hasMed, width, height, duration } = (await req.json()) as any;
       const it = validId(id) ? await getItem(id) : null;
       if (!it) return json({ error: "No existe" }, 404);
       if (name !== undefined) it.name = clean(name, it.name);
       if (folder !== undefined) it.folder = clean(folder, "Sin carpeta");
+      if (hasThumb === true && await s.getMetadata(`thumb/${id}`)) it.hasThumb = true;
+      if (hasMed === true && await s.getMetadata(`med/${id}`)) it.hasMed = true;
+      if (Number(width) > 0 && !it.width) { it.width = Number(width); it.height = Number(height) || undefined; }
+      if (Number(duration) > 0 && !it.duration) it.duration = Number(duration);
       await s.setJSON(itemKey(id), it);
       return json({ ok: true, item: it });
     }
@@ -259,7 +318,7 @@ export default async (req: Request) => {
       if (!it || !it.complete) return json({ error: "No encontrado" }, 404);
       const range = req.headers.get("range");
       // solo se muestran en el navegador tipos seguros; lo demás se descarga (evita que un .html corra dentro de la app)
-      const inline = /^(image\/(jpeg|png|gif|webp|heic|heif)|video\/|audio\/|application\/pdf$|text\/plain$)/i.test(it.type);
+      const inline = /^(image\/(jpeg|png|gif|webp|heic|heif)|video\/|audio\/|application\/pdf$|text\/plain(;|$))/i.test(it.type);
       const fname = encodeURIComponent(`${it.name}.${it.ext}`);
       const common = {
         "content-type": inline ? it.type : "application/octet-stream", "accept-ranges": "bytes", "cache-control": "private, max-age=86400",
