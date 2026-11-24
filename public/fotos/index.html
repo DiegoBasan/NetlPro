@@ -172,6 +172,33 @@
   .textview a { color: inherit; text-decoration: underline; }
   .roundbtn.hdcam { font: 700 13px var(--f-mono); }
   .keyout { font: 12px var(--f-mono) !important; }
+  .phead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .btn.sm { padding: 6px 11px; font-size: 13px; border-radius: 9px; }
+  .tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 14px 8px; }
+  .tool { position: relative; display: grid; justify-items: center; gap: 6px; text-decoration: none; color: var(--fg); min-width: 0; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+  .tool .tic { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; color: #fff; position: relative;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.14); transition: transform .15s; }
+  .tool .tic::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 55%); pointer-events: none; }
+  .tool:active .tic { transform: scale(.92); }
+  .tool .tic img { width: 34px; height: 34px; border-radius: 9px; background: #fff; padding: 3px; }
+  .tool span { font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tool.add .tic { background: transparent; border: 2px dashed var(--line); color: var(--muted); box-shadow: none; }
+  .tool.add .tic::after { display: none; }
+  .tools.editing .tool:not(.add) .tic { animation: wig .28s ease-in-out infinite alternate; }
+  .tools.editing .tool:not(.add)::after { content: "✎"; position: absolute; top: -6px; right: calc(50% - 36px); width: 22px; height: 22px; border-radius: 50%;
+    background: var(--fg); color: var(--bg); font-size: 12px; display: grid; place-items: center; }
+  @keyframes wig { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+  .toolsheet .sheet { margin-top: 4vh; }
+  .toolprev { display: flex; justify-content: center; padding: 4px 0 2px; pointer-events: none; }
+  .iconpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+  .iconpick button { height: 44px; border-radius: 11px; border: 1.5px solid var(--line); background: var(--bg); color: var(--fg); display: grid; place-items: center; cursor: pointer; padding: 0; }
+  .iconpick button[aria-pressed="true"] { border-color: var(--fg); background: var(--surface-2); }
+  .iconpick img { width: 22px; height: 22px; border-radius: 5px; }
+  .colorpick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .colorpick button { width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+  .colorpick button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--fg); }
+  .sheet .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (prefers-reduced-motion: reduce) { .tools.editing .tool .tic { animation: none; } }
   details.guide { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
   details.guide summary { font-weight: 600; cursor: pointer; }
   details.guide ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; }
@@ -297,6 +324,10 @@
       </div>
       <button id="txtSend" class="btn primary block" disabled>Enviar texto</button>
     </div>
+    <div class="panel">
+      <div class="phead"><span class="lbl">Tools</span><button type="button" class="btn sm" id="toolsEdit" hidden>Editar</button></div>
+      <div class="tools" id="toolsGrid"></div>
+    </div>
   </section>
 
   <!-- GALERÍA -->
@@ -384,6 +415,22 @@
   </div>
 </div>
 
+<!-- TOOL -->
+<div class="modal settings toolsheet" id="toolSheet" hidden>
+  <form class="sheet" id="toolForm" autocomplete="off">
+    <h2 id="toolTitle">Nueva tool</h2>
+    <div class="toolprev" id="toolPrev"></div>
+    <div class="field"><label for="tName">Nombre</label><input id="tName" type="text" maxlength="40" placeholder="Ej. PDF a Word"></div>
+    <div class="field"><label for="tUrl">Link</label><input id="tUrl" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="Ej. ilovepdf.com/pdf_to_word"></div>
+    <div class="field"><span class="lbl">Ícono</span><div class="iconpick" id="iconPick"></div></div>
+    <div class="field"><span class="lbl">Color</span><div class="colorpick" id="colorPick"></div></div>
+    <p class="err" id="toolErr" hidden></p>
+    <button class="btn primary block" type="submit">Guardar</button>
+    <div class="row2" id="toolMove"><button type="button" class="btn" data-move="-1">← Mover</button><button type="button" class="btn" data-move="1">Mover →</button></div>
+    <div class="row2"><button type="button" class="btn" id="toolCancel">Cancelar</button><button type="button" class="btn danger" id="toolDel">Borrar</button></div>
+  </form>
+</div>
+
 <!-- CUENTA -->
 <div class="modal settings" id="settings" hidden>
   <form class="sheet" id="pwForm" autocomplete="on">
@@ -462,6 +509,7 @@ const fmtDateLong = (ms) => new Date(ms).toLocaleString("es-MX", { dateStyle: "f
 const cleanName = (s, fb) => (s || "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").replace(/\s+/g, " ").trim().slice(0, 120) || fb;
 const isPhone = () => matchMedia("(max-width: 700px)").matches || /iPhone|iPad|Android/i.test(navigator.userAgent);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const rid = (n = 8) => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => (b % 36).toString(36)).join("");
 const extFor = (file, type) => {
   const m = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "video/quicktime": "mov", "video/mp4": "mp4", "video/webm": "webm", "video/x-m4v": "m4v" };
   const fromName = (file.name.match(/\.([a-z0-9]{2,5})$/i) || [])[1];
@@ -543,6 +591,7 @@ function showApp() {
   const saved = ls.get("fp_tab");
   setTab(TABS.includes(saved) ? saved : isPhone() ? "up" : "gal");
   loadGallery(true);
+  loadTools();
 }
 
 /* ---------- cuenta ---------- */
@@ -875,6 +924,121 @@ async function copyText(it, btn) {
   } catch (e) { console.error(e); toast("No se pudo copiar. Ábrelo y selecciona el texto."); }
   if (btn) setTimeout(() => { btn.textContent = old; }, 1600);
 }
+
+/* ---------- Tools: accesos directos a páginas ---------- */
+const sv = (d) => `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const TOOL_ICONS = {
+  site: null,  // logo del sitio
+  link: sv('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'),
+  pdf: sv('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 17v-4h1.5a1.25 1.25 0 0 1 0 2.5H8M13 13v4h1a2 2 0 0 0 0-4zM18 13h-1.5v4M16.5 15H18"/>'),
+  convert: sv('<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>'),
+  image: sv('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'),
+  video: sv('<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m22 8-6 4 6 4z"/>'),
+  doc: sv('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/>'),
+  sheet: sv('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>'),
+  code: sv('<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>'),
+  translate: sv('<path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/>'),
+  calc: sv('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h4"/>'),
+  cloud: sv('<path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.5 12 3.5 3.5 0 0 0 6 19z"/>'),
+  mail: sv('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>'),
+  chat: sv('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
+  ai: sv('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8zM5 2l.6 1.4L7 4l-1.4.6L5 6l-.6-1.4L3 4l1.4-.6z"/>'),
+  tool: sv('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>'),
+  cad: sv('<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/>'),
+  globe: sv('<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>'),
+  star: sv('<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>'),
+};
+const TOOL_COLORS = ["#3a3a3c", "#0a84ff", "#30b0c7", "#34c759", "#ff9f0a", "#ff453a", "#ff375f", "#bf5af2", "#5e5ce6", "#a2845e"];
+let tools = []; let toolsEditing = false; let editingTool = null; let toolDraft = null;
+try { tools = JSON.parse(ls.get("fp_tools") || "[]"); } catch { tools = []; }
+const normUrl = (u) => {
+  u = (u || "").trim(); if (!u || /\s/.test(u)) return "";
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  try { const x = new URL(u); return /^[^.]+\..+[a-z0-9]$/i.test(x.hostname) ? x.href : ""; } catch { return ""; }
+};
+const toolHost = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+const favicon = (u) => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(toolHost(u))}&sz=64`;
+function toolIconHtml(t) {
+  if (t.icon === "site") return t.url ? `<img src="${favicon(t.url)}" alt="" onerror="this.replaceWith(document.createRange().createContextualFragment(TOOL_ICONS.link))">` : TOOL_ICONS.globe;
+  return TOOL_ICONS[t.icon] || TOOL_ICONS.link;
+}
+const toolTile = (t, tag = "a") => `<${tag} class="tool" ${tag === "a" ? `href="${esc(t.url)}" target="_blank" rel="noopener"` : 'type="button"'} data-id="${esc(t.id || "")}">
+  <span class="tic" style="background:${esc(t.color)}">${toolIconHtml(t)}</span><span>${esc(t.name || "Tool")}</span></${tag}>`;
+function renderTools() {
+  const g = $("#toolsGrid");
+  g.classList.toggle("editing", toolsEditing);
+  g.innerHTML = tools.map(t => toolTile(t)).join("") +
+    `<button type="button" class="tool add" id="toolAdd"><span class="tic">${sv('<path d="M12 5v14M5 12h14"/>')}</span><span>Agregar</span></button>`;
+  $("#toolsEdit").hidden = !tools.length;
+  $("#toolsEdit").textContent = toolsEditing ? "Listo" : "Editar";
+}
+async function loadTools() {
+  try { const d = await api("tools"); tools = d.tools || []; ls.set("fp_tools", JSON.stringify(tools)); renderTools(); } catch {}
+}
+async function saveTools() {
+  const d = await api("tools", { method: "PUT", json: { tools } });
+  tools = d.tools; ls.set("fp_tools", JSON.stringify(tools)); renderTools();
+}
+$("#toolsEdit").onclick = () => { toolsEditing = !toolsEditing; renderTools(); };
+$("#toolsGrid").addEventListener("click", (e) => {
+  if (e.target.closest("#toolAdd")) { openToolSheet(null); return; }
+  const a = e.target.closest(".tool"); if (!a) return;
+  if (toolsEditing) { e.preventDefault(); openToolSheet(tools.find(t => t.id === a.dataset.id)); }
+});
+function openToolSheet(t) {
+  editingTool = t;
+  toolDraft = t ? { ...t } : { name: "", url: "", icon: "site", color: TOOL_COLORS[tools.length % TOOL_COLORS.length] };
+  $("#toolTitle").textContent = t ? "Editar tool" : "Nueva tool";
+  $("#tName").value = toolDraft.name; $("#tUrl").value = toolDraft.url;
+  $("#toolDel").hidden = !t; $("#toolDel").textContent = "Borrar"; $("#toolDel").className = "btn danger";
+  $("#toolMove").hidden = !t || tools.length < 2; $("#toolErr").hidden = true;
+  renderToolPickers(); $("#toolSheet").hidden = false;
+  if (!t) setTimeout(() => $("#tUrl").focus(), 50);
+}
+function renderToolPickers() {
+  const d = toolDraft;
+  $("#toolPrev").innerHTML = toolTile({ ...d, url: normUrl(d.url) }, "div");
+  $("#iconPick").innerHTML = Object.keys(TOOL_ICONS).map(k => `<button type="button" data-icon="${k}" aria-pressed="${d.icon === k}" aria-label="${k === "site" ? "Logo del sitio" : k}">${
+    k === "site" ? (normUrl(d.url) ? `<img src="${favicon(normUrl(d.url))}" alt="">` : TOOL_ICONS.globe) : TOOL_ICONS[k]}</button>`).join("");
+  $("#colorPick").innerHTML = TOOL_COLORS.map(c => `<button type="button" data-color="${c}" style="background:${c}" aria-pressed="${d.color === c}" aria-label="Color ${c}"></button>`).join("");
+}
+$("#tName").oninput = () => { toolDraft.name = $("#tName").value; $("#toolPrev").innerHTML = toolTile({ ...toolDraft, url: normUrl(toolDraft.url) }, "div"); };
+$("#tUrl").oninput = () => { toolDraft.url = $("#tUrl").value; };
+$("#tUrl").onchange = () => {
+  toolDraft.url = $("#tUrl").value;
+  if (!toolDraft.name.trim() && toolHost(normUrl(toolDraft.url))) { toolDraft.name = toolHost(normUrl(toolDraft.url)).split(".")[0].replace(/^./, c => c.toUpperCase()); $("#tName").value = toolDraft.name; }
+  renderToolPickers();
+};
+$("#iconPick").onclick = (e) => { const b = e.target.closest("[data-icon]"); if (b) { toolDraft.icon = b.dataset.icon; renderToolPickers(); } };
+$("#colorPick").onclick = (e) => { const b = e.target.closest("[data-color]"); if (b) { toolDraft.color = b.dataset.color; renderToolPickers(); } };
+$("#toolCancel").onclick = () => { $("#toolSheet").hidden = true; };
+$("#toolSheet").onclick = (e) => { if (e.target.id === "toolSheet") $("#toolSheet").hidden = true; };
+$("#toolForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const url = normUrl($("#tUrl").value), name = $("#tName").value.trim() || toolHost(url);
+  if (!url) { $("#toolErr").textContent = "Escribe un link válido, por ejemplo ilovepdf.com"; $("#toolErr").hidden = false; return; }
+  const t = { ...toolDraft, name, url };
+  const prev = tools.slice();
+  if (editingTool) tools = tools.map(x => x.id === editingTool.id ? { ...t, id: x.id } : x);
+  else tools = [...tools, { ...t, id: rid() }];
+  try { await saveTools(); $("#toolSheet").hidden = true; toast(editingTool ? "Tool guardada" : "Tool agregada"); }
+  catch (err) { tools = prev; renderTools(); $("#toolErr").textContent = err.message; $("#toolErr").hidden = false; }
+};
+$("#toolDel").onclick = async () => {
+  const b = $("#toolDel");
+  if (!b.classList.contains("solid-danger")) { b.textContent = "Toca otra vez para borrar"; b.className = "btn solid-danger"; return; }
+  const prev = tools.slice(); tools = tools.filter(x => x.id !== editingTool.id);
+  try { await saveTools(); $("#toolSheet").hidden = true; toast("Tool borrada"); if (!tools.length) { toolsEditing = false; renderTools(); } }
+  catch (err) { tools = prev; renderTools(); toast(err.message); }
+};
+$("#toolMove").onclick = async (e) => {
+  const b = e.target.closest("[data-move]"); if (!b || !editingTool) return;
+  const i = tools.findIndex(x => x.id === editingTool.id), j = i + Number(b.dataset.move);
+  if (i < 0 || j < 0 || j >= tools.length) return;
+  const prev = tools.slice(); [tools[i], tools[j]] = [tools[j], tools[i]];
+  try { await saveTools(); } catch (err) { tools = prev; renderTools(); toast(err.message); }
+};
+renderTools();
 
 /* ---------- cámara ---------- */
 let camStream = null, camFacing = "environment", camStarting = false, torchOn = false;
@@ -1225,7 +1389,7 @@ function closeViewer() { $("#viewerMedia").innerHTML = ""; $("#viewer").hidden =
 $("#viewerClose").onclick = closeViewer;
 $("#viewer").onclick = (e) => { if (e.target.id === "viewer") closeViewer(); };
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { if (!$("#viewer").hidden) closeViewer(); $("#settings").hidden = true; }
+  if (e.key === "Escape") { if (!$("#viewer").hidden) closeViewer(); $("#settings").hidden = true; $("#toolSheet").hidden = true; }
   if ((e.key === " " || e.key === "Enter") && currentTab === "cam" && document.activeElement?.tagName !== "INPUT") { e.preventDefault(); $("#shutter").click(); }
 });
 $("#editName").onkeydown = $("#editFolder").onkeydown = (e) => { if (e.key === "Enter") $("#editSave").click(); };

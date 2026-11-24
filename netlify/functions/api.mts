@@ -155,6 +155,28 @@ export default async (req: Request) => {
 
     if (route === "me") return json({ user: (await getCreds()).user });
 
+    // Tools: accesos directos a páginas (convertidores, etc.), guardados en el servidor para verse igual en todos lados
+    if (route === "tools") {
+      if (req.method === "GET") return json({ tools: (await s.get("settings/tools", { type: "json" })) || [] });
+      if (req.method === "PUT") {
+        const raw = (await req.json().catch(() => ({}))) as any;
+        const tools = (Array.isArray(raw.tools) ? raw.tools : []).slice(0, 60).map((t: any) => {
+          let u = String(t?.url || "").trim().slice(0, 1000);
+          if (u && !/^https?:\/\//i.test(u)) u = "https://" + u;
+          try { u = new URL(u).href; } catch { u = ""; }
+          return {
+            id: /^[a-z0-9-]{4,40}$/i.test(t?.id) ? t.id : randomUUID().slice(0, 10),
+            name: String(t?.name || "").trim().slice(0, 40) || "Tool",
+            url: u,
+            icon: /^[a-z0-9-]{1,20}$/.test(t?.icon) ? t.icon : "link",
+            color: /^#[0-9a-f]{6}$/i.test(t?.color) ? t.color : "#3a3a3c",
+          };
+        }).filter((t: any) => t.url);
+        await s.setJSON("settings/tools", tools);
+        return json({ ok: true, tools });
+      }
+    }
+
     // clave de larga duración para el atajo de iPhone (se invalida si cambias la contraseña)
     if (route === "apptoken" && req.method === "POST") return json({ token: await issueToken(3650) });
 
